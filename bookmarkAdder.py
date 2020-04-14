@@ -13,7 +13,7 @@ import xlwt
 bookmark_fields=["content","layer","page_num"]
 Bookmark=namedtuple("Bookmark",bookmark_fields)
 
-txt_dir="D:/pdf书签处理总站/血酬定律-吴思"
+txt_dir="D:/pdf书签处理总站"
 
 def bookmark_print(some_bookmark:Bookmark):
     for key,val in some_bookmark._asdict().items():
@@ -59,21 +59,53 @@ def getToken_oneline(one_line:str,line_cnt:int,base_page_num:int):
     format_one_line_content="  ".join(one_line_content.split())
 
     one_line_y_position=704
-    # line_cnt 此处删去，若后面需要则加在第一个位子上
-    one_line_tokens=[format_one_line_content,one_line_layer,one_line_page_num,one_line_y_position]
 
-    print("Line Cnt:{}\nContent:{}\nLayer:{}\nPage_num:{}\n".format(line_cnt,format_one_line_content,one_line_layer,one_line_page_num))
+    if one_line_layer==1:
+        one_line_color="red"
+    elif one_line_layer==2:
+        one_line_color="blue"
+    elif one_line_layer==3:
+        one_line_color="mise"
+    elif one_line_layer>3:
+        one_line_color="black"
+
+
+    # line_cnt 此处删去，若后面需要则加在第一个位子上
+    one_line_tokens=[format_one_line_content,one_line_layer,one_line_page_num,one_line_y_position,one_line_color]
+
+    print("Line Cnt:{}\nContent:{}\nLayer:{}\nPage_num:{}\nColor:{}\nn".format(line_cnt,format_one_line_content,one_line_layer,one_line_page_num,one_line_color))
     return one_line_tokens
 
-def write2xls(one_file_tokens:[[]],file_name):
+def write2xls(one_file_tokens:[[]],file_name:str,fathers:[int]):
+
+    # full 是我自己的
+    # 普通的bookmark是给pdfb.exe 软件的
+
     writer=pd.ExcelWriter("{}.xls".format(file_name))
+    writer2=pd.ExcelWriter("full_{}.xls".format(file_name))
     # https://zhuanlan.zhihu.com/p/28119708
     # 原先是下面这行，因为一开始把Level和Layer，还有Content之类的混了，现在注释掉，大家也知道大致是什么意思
     # data_flame=pd.DataFrame(data=one_file_tokens,columns=["Line Cnt","Content","Layer","Pagenum","Y position"])
-    data_flame=pd.DataFrame(data=one_file_tokens,columns=["Bookmark","Level","Page","Y position"])
-    data_flame.to_excel(writer,"sheet1",index=False)
+    data_flame=pd.DataFrame(data=one_file_tokens,columns=["Bookmark","Level","Page","Y position","Color"])
+    data_flame.to_excel(writer,"sheet1",index=False,columns=["Bookmark","Level","Page","Y position"])
+
+    new_fathers=[]
+
+    for father in fathers:
+        if father=="null":
+            new_father=father
+        elif isinstance(father,int):
+            new_father="第{}行".format(str(father+2))
+        new_fathers.append(new_father)
+
+
+    data_flame["Father"]=new_fathers
+
+    data_flame.to_excel(writer2,"sheet1",index=False,columns=["Bookmark","Level","Page","Father","Color"])
+
 
     writer.save()
+    writer2.save()
     print("Write done.")
 
 # def write2json(one_file_tokens:[[]],file_name):
@@ -158,6 +190,13 @@ def main():
             mise_tup=(0.4,0.5,0.4)
             black_tup=(0,0,0)
 
+            colors_tups={}
+
+            colors_tups["red"]=red_tup
+            colors_tups["blue"]=blue_tup
+            colors_tups["mise"]=mise_tup
+            colors_tups["black"]=black_tup
+
             addbookmark_objs=[None]*10000
 
             # 写入pdf文档
@@ -166,7 +205,7 @@ def main():
                 pdf_wt.addPage(each_page)
             for each_idx,one_line_tokens in enumerate(one_file_tokens):
                 page_num: str
-                bookmark, layer, page_num, mmp=one_line_tokens
+                bookmark, layer, page_num, y_pos,color=one_line_tokens
                 father_idx:str
                 father_idx=fathers[each_idx]
                 if father_idx=="null":
@@ -177,17 +216,22 @@ def main():
                     continue
                 father_obj=addbookmark_objs[int(father_idx)]
                 assert layer!=1
-                if layer==2:
-                    addbookmark_obj=pdf_wt.addBookmark(title=bookmark,pagenum=int(page_num)-1,parent=father_obj,color=blue_tup)
-                elif layer==3:
-                    addbookmark_obj=pdf_wt.addBookmark(title=bookmark,pagenum=int(page_num)-1,parent=father_obj,color=mise_tup)
-                elif layer!=1:
-                    addbookmark_obj=pdf_wt.addBookmark(title=bookmark,pagenum=int(page_num)-1,parent=father_obj,color=black_tup)
+                addbookmark_obj = pdf_wt.addBookmark(title=bookmark, pagenum=int(page_num) - 1, parent=father_obj,
+                                                     color=colors_tups[color])
                 addbookmark_objs[each_idx] = addbookmark_obj
+
+            if txt_dir!=os.getcwd():
+                os.chdir(txt_dir)
+
+
+            if not os.path.exists(file_name):
+                os.mkdir(file_name)
+
+            os.chdir(file_name)
             with open("bookmark_"+file_name+".pdf","wb") as f:
                 pdf_wt.write(f)
                 # print(one_line_tokens)
-            write2xls(one_file_tokens,"bookmark_"+file_name)
+            write2xls(one_file_tokens,"bookmark_"+file_name,fathers=fathers)
             # write2json(one_file_tokens,file_name)
     print("done.")
             # print("**--**")

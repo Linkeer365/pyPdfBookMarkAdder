@@ -13,7 +13,7 @@ import xlwt
 bookmark_fields=["content","layer","page_num"]
 Bookmark=namedtuple("Bookmark",bookmark_fields)
 
-txt_dir="D:/pdf书签处理总站"
+txt_dir="./pdf_to_trans"
 
 def bookmark_print(some_bookmark:Bookmark):
     for key,val in some_bookmark._asdict().items():
